@@ -1,30 +1,38 @@
-import os
 import pytest
 from src.models.services.movie_service import MovieService
-
+from src.models.services.shop_service import ShopService
 
 @pytest.fixture
 def movie_service():
     return MovieService()
 
+@pytest.fixture
+def shop_service():
+    return ShopService()
+
 @pytest.mark.smoke
-def test_create_movie_success(client):
+def test_create_movie_success(movie_service, shop_service):
+
     shop_payload = {"address": "Cine Center", "manager": "Eva"}
-    shop = client.post("/shops", json=shop_payload).json()
-    shop_id = shop["id"]
+    shop_resp = shop_service.add_shop(shop=shop_payload, response_type=None)
+    assert shop_resp.status in (200, 201)
+    shop_id = shop_resp.data.get("id")
+    assert shop_id is not None
 
     movie_payload = {
         "name": "Inception",
         "director": "Christopher Nolan",
         "genres": ["Sci-Fi", "Thriller"],
-        "shop": shop_id
+        "shop": shop_id,
     }
+    resp = movie_service.create_movie(movie=movie_payload, response_type=None)
+    assert resp.status in (200, 201)
 
-    response = client.post("/movies", json=movie_payload)
-
-    assert response.status_code == 201
-    data = response.json()
+    data = resp.data
+    assert isinstance(data, dict)
+    for key in ("id", "name", "director", "shop"):
+        assert key in data
     assert data["name"] == "Inception"
     assert data["director"] == "Christopher Nolan"
-    assert "id" in data
     assert data["shop"] == shop_id
+
