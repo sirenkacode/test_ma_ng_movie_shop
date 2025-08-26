@@ -89,3 +89,69 @@ def test_response_contract_consistency_headers_and_error_body(movie_service):
     upd_body = getattr(upd_resp, "data", None)
     assert upd_body is not None
     _assert_error_shape(upd_body)
+
+def test_contract_consistency_response_body_structure(movie_service):
+    """
+    TC-018: Contract & consistency (response body structure)
+    Verifica que las respuestas exitosas tengan la estructura correcta.
+    """
+    # Crear un movie válido como precondición
+    payload = {
+        "name": "Contract Test",
+        "director": "Tester",
+        "genres": ["Drama"],
+        "shop": 1,  # asumimos que el shop 1 existe, si no creamos uno nuevo
+    }
+    create = movie_service.create_movie(movie=payload, response_type=None)
+    assert create.status in (200, 201)
+
+    # Obtener lista de movies
+    resp = movie_service.get_movies(response_type=list[dict])
+    assert resp.status == 200
+    assert isinstance(resp.data, list)
+
+    if resp.data:
+        movie = resp.data[0]
+        # Validar presencia de keys básicas
+        expected_keys = {"id", "name", "director", "genres", "shop"}
+        assert expected_keys.issubset(movie.keys())
+
+        # Validar tipos de datos
+        assert isinstance(movie["id"], int)
+        assert isinstance(movie["name"], str)
+        assert isinstance(movie["director"], str)
+        assert isinstance(movie["genres"], list)
+        assert all(isinstance(g, str) for g in movie["genres"])
+        assert isinstance(movie["shop"], int)
+
+def test_contract_consistency_movies_schema(movie_service):
+    """
+    TC-019: Contract & consistency (movies schema validation)
+    Verifica que todas las movies cumplan con el contrato de schema:
+    - Campos obligatorios presentes (id, name, director, genres, shop).
+    - Tipos correctos en cada campo.
+    - Valores válidos (id > 0, shop > 0, etc.).
+    """
+    resp = movie_service.get_movies(response_type=list[dict])
+    assert resp.status == 200
+    assert isinstance(resp.data, list)
+
+    for movie in resp.data:
+        # Keys obligatorias
+        expected_keys = {"id", "name", "director", "genres", "shop"}
+        assert expected_keys.issubset(movie.keys()), f"Faltan keys en {movie}"
+
+        # Tipos
+        assert isinstance(movie["id"], int)
+        assert isinstance(movie["name"], str)
+        assert isinstance(movie["director"], str)
+        assert isinstance(movie["genres"], list)
+        assert all(isinstance(g, str) for g in movie["genres"]), f"Genres inválidos: {movie['genres']}"
+        assert isinstance(movie["shop"], int)
+
+        # Valores básicos
+        assert movie["id"] > 0
+        assert movie["shop"] > 0
+        assert movie["name"].strip() != ""
+        assert movie["director"].strip() != ""
+
