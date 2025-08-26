@@ -36,3 +36,27 @@ def test_create_movie_success(movie_service, shop_service):
     assert data["director"] == "Christopher Nolan"
     assert data["shop"] == shop_id
 
+def test_create_movie_validation_error(movie_service, shop_service):
+    """
+    TC-005: POST /movies (validation error)
+    """
+
+    shop_payload = {"address": "Validation Shop", "manager": "Vera"}
+    shop_resp = shop_service.add_shop(shop=shop_payload, response_type=None)
+    assert shop_resp.status in (200, 201)
+    shop_id = shop_resp.data.get("id")
+    assert shop_id is not None
+
+  
+    invalid_payload = {
+        "name": "Invalid Movie",
+        "director": "Nobody",
+        "genres": "Drama",
+        "shop": shop_id,
+    }
+
+    resp = movie_service.create_movie(movie=invalid_payload, response_type=None)
+
+    assert resp.status in (400, 422)
+
+

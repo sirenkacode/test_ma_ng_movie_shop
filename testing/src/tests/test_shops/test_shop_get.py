@@ -16,7 +16,7 @@ def test_get_shops_success(shop_service):
     if response.data:
         first = response.data[0]
         assert isinstance(first, dict)
-        for key in ("id", "name"):
+        for key in ("id", "address", "manager"):
             assert key in first
 
 
