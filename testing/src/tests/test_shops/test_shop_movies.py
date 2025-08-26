@@ -187,3 +187,21 @@ def test_get_shop_movies_available_false(shop_service, movie_service):
             pytest.skip("El backend no está devolviendo rentadas con available=false (ninguna rent=True)")
         # Si hay al menos una rentada, todas deberían serlo
         assert all(rents), f"Se esperaban todas rentadas. rents={rents}"
+
+def test_get_shop_movies_invalid_id_format(shop_service):
+    """
+    TC-025: GET /shops/{id}/movies (invalid id format)
+    Intenta invocar el endpoint con un id inválido (ej. 'abc').
+    Debe devolver error 422 (Unprocessable Entity) o 400.
+    """
+
+    # Usamos un id claramente inválido: string no convertible a int
+    invalid_id = "abc"
+
+    resp = shop_service.get_shop_movies(
+        shop_id=invalid_id,
+        response_type=list[dict]
+    )
+
+    # Esperado: error de validación o bad request
+    assert resp.status in (400, 422)
