@@ -122,3 +122,21 @@ def test_get_shop_movies_nonexistent(shop_service):
 
     # Validación
     assert resp.status in (404, 400, 422), f"Status inesperado: {resp.status}"
+
+def test_get_shop_movies_empty(shop_service):
+    """
+    TC-023 — GET /shops/{id}/movies (shop exists but no movies)
+    Verifica que un shop válido sin películas devuelva 200 y una lista vacía.
+    """
+    # Crear un shop sin movies
+    shop_resp = shop_service.add_shop({"address": "Shop T23", "manager": "Vacio"}, response_type=None)
+    assert shop_resp.status in (200, 201)
+    shop_id = shop_resp.data["id"]
+
+    # Pedir movies de ese shop
+    resp = shop_service.get_shop_movies(shop_id=shop_id, response_type=list[dict])
+
+    # Validación
+    assert resp.status == 200
+    assert isinstance(resp.data, list)
+    assert resp.data == [] or len(resp.data) == 0
