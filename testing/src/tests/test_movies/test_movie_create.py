@@ -59,4 +59,27 @@ def test_create_movie_validation_error(movie_service, shop_service):
 
     assert resp.status in (400, 422)
 
+def test_create_movie_invalid_body_format(movie_service, shop_service):
+    """
+    TC-020 — POST /movies (invalid body format)
+    Intenta crear una movie con body inválido:
+    - 'genres' enviado como string en lugar de lista.
+    Esperado: 422/400 y que no se cree la película.
+    """
+    # Precondición: crear un shop válido
+    shop_resp = shop_service.add_shop({"address": "Shop T20", "manager": "Carla"}, response_type=None)
+    assert shop_resp.status in (200, 201)
+    shop_id = shop_resp.data["id"]
 
+    # Payload inválido
+    invalid_payload = {
+        "name": "Bad Movie",
+        "director": "Nobody",
+        "genres": "Drama",   # ❌ debería ser lista de strings
+        "shop": shop_id,
+    }
+
+    resp = movie_service.create_movie(movie=invalid_payload, response_type=dict)
+
+    # Validar respuesta de error
+    assert resp.status in (400, 422), f"Esperaba 400/422 y recibí {resp.status}"
