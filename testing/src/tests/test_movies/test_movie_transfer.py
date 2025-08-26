@@ -71,3 +71,49 @@ def test_transfer_movie_success(shop_service, movie_service):
     final_list = movie_service.get_movies(response_type=list[dict])
     assert final_list.status == 200
     assert any(m.get("name") == "Interstellar" and m.get("shop") == shop2_id for m in final_list.data)
+
+
+def test_transfer_movie_invalid_shop(shop_service, movie_service):
+    """
+    TC-016: POST /movies/{id}/transfer (invalid transfer)
+    Intenta mover la movie a un shop inválido (p.ej. -1).
+    Espera error (422/404/400) o, si la API responde 200, 
+    valida que la movie permanezca en el shop original.
+    """
+    # Shop origen
+    shop_resp = shop_service.add_shop({"address": "Origin Shop T16", "manager": "Laura"}, response_type=None)
+    assert shop_resp.status in (200, 201)
+    origin_shop_id = shop_resp.data["id"]
+
+    # Movie en shop origen
+    create = movie_service.create_movie(
+        {"name": "Blade Runner", "director": "Ridley Scott", "genres": ["Sci-Fi"], "shop": origin_shop_id},
+        response_type=None
+    )
+    assert create.status in (200, 201)
+    movie_id = create.data["id"]
+
+    # Payload completo con shop inválido
+    invalid_shop_id = -1
+    payload = {
+        "name": "Blade Runner",
+        "director": "Ridley Scott",
+        "genres": ["Sci-Fi"],
+        "shop": invalid_shop_id,
+    }
+    resp = movie_service.update_movie(movie_id=movie_id, movie=payload, response_type=None)
+
+    # Caso 1: backend responde con error
+    if resp.status in (400, 404, 422):
+        assert True  # se acepta como válido
+
+    # Caso 2: backend responde 200 → validar que no se transfirió
+    elif resp.status == 200:
+        after = movie_service.get_movies(response_type=list[dict])
+        assert after.status == 200
+        found = next((m for m in after.data if m["id"] == movie_id), None)
+        assert found is not None
+        assert found["shop"] == origin_shop_id
+
+    else:
+        pytest.fail(f"Respuesta inesperada: {resp.status}")
