@@ -2,6 +2,7 @@ import pytest
 from src.models.services.movie_service import MovieService
 from src.models.services.shop_service import ShopService
 
+# ---------- Fixtures ----------
 @pytest.fixture
 def movie_service():
     return MovieService()
@@ -10,76 +11,79 @@ def movie_service():
 def shop_service():
     return ShopService()
 
+# ---------- Helpers ----------
+def _mk_shop(shop_service: ShopService, address="Cine Center", manager="Eva") -> int:
+    """Crea un shop válido y devuelve su id."""
+    resp = shop_service.add_shop({"address": address, "manager": manager}, response_type=None)
+    assert resp.status in (200, 201)
+    return resp.data["id"]
+
+# ---------- Tests de creación de movies ----------
+
 @pytest.mark.smoke
-def test_create_movie_success(movie_service, shop_service):
+def test_create_movie_success(movie_service: MovieService, shop_service: ShopService):
+    """
+    TC-006 — POST /movies success
+    Crea una movie válida y valida el esquema básico de respuesta.
+    """
+    shop_id = _mk_shop(shop_service)
 
-    shop_payload = {"address": "Cine Center", "manager": "Eva"}
-    shop_resp = shop_service.add_shop(shop=shop_payload, response_type=None)
-    assert shop_resp.status in (200, 201)
-    shop_id = shop_resp.data.get("id")
-    assert shop_id is not None
-
-    movie_payload = {
+    payload = {
         "name": "Inception",
         "director": "Christopher Nolan",
         "genres": ["Sci-Fi", "Thriller"],
         "shop": shop_id,
     }
-    resp = movie_service.create_movie(movie=movie_payload, response_type=None)
+    resp = movie_service.create_movie(movie=payload, response_type=None)
     assert resp.status in (200, 201)
 
     data = resp.data
     assert isinstance(data, dict)
-    for key in ("id", "name", "director", "shop"):
-        assert key in data
+
+    # Claves mínimas esperadas
+    expected_keys = {"id", "name", "director", "shop"}
+    assert expected_keys.issubset(data.keys())
+
+    # Tipos y valores
+    assert isinstance(data["id"], int)
+    assert isinstance(data["name"], str)
+    assert isinstance(data["director"], str)
+    assert isinstance(data["shop"], int)
+
     assert data["name"] == "Inception"
     assert data["director"] == "Christopher Nolan"
     assert data["shop"] == shop_id
 
-def test_create_movie_validation_error(movie_service, shop_service):
-    """
-    TC-005: POST /movies (validation error)
-    """
 
-    shop_payload = {"address": "Validation Shop", "manager": "Vera"}
-    shop_resp = shop_service.add_shop(shop=shop_payload, response_type=None)
-    assert shop_resp.status in (200, 201)
-    shop_id = shop_resp.data.get("id")
-    assert shop_id is not None
+def test_create_movie_validation_error(movie_service: MovieService, shop_service: ShopService):
+    """
+    TC-005 — POST /movies (validation error)
+    Rechaza payload inválido (genres como string).
+    """
+    shop_id = _mk_shop(shop_service, address="Validation Shop", manager="Vera")
 
-  
     invalid_payload = {
         "name": "Invalid Movie",
         "director": "Nobody",
-        "genres": "Drama",
+        "genres": "Drama",        # ❌ debería ser list[str]
         "shop": shop_id,
     }
-
-    resp = movie_service.create_movie(movie=invalid_payload, response_type=None)
-
+    resp = movie_service.create_movie(movie=invalid_payload, response_type=dict)
     assert resp.status in (400, 422)
 
-def test_create_movie_invalid_body_format(movie_service, shop_service):
+
+def test_create_movie_invalid_body_format(movie_service: MovieService, shop_service: ShopService):
     """
     TC-020 — POST /movies (invalid body format)
-    Intenta crear una movie con body inválido:
-    - 'genres' enviado como string en lugar de lista.
-    Esperado: 422/400 y que no se cree la película.
+    Mismo patrón de invalidez que TC-005 para cubrir contrato de formato.
     """
-    # Precondición: crear un shop válido
-    shop_resp = shop_service.add_shop({"address": "Shop T20", "manager": "Carla"}, response_type=None)
-    assert shop_resp.status in (200, 201)
-    shop_id = shop_resp.data["id"]
+    shop_id = _mk_shop(shop_service, address="Shop T20", manager="Carla")
 
-    # Payload inválido
     invalid_payload = {
         "name": "Bad Movie",
         "director": "Nobody",
-        "genres": "Drama",   # ❌ debería ser lista de strings
+        "genres": "Drama",        # ❌ debería ser list[str]
         "shop": shop_id,
     }
-
     resp = movie_service.create_movie(movie=invalid_payload, response_type=dict)
-
-    # Validar respuesta de error
     assert resp.status in (400, 422), f"Esperaba 400/422 y recibí {resp.status}"

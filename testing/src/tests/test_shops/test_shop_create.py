@@ -1,4 +1,3 @@
-import os
 import pytest
 from src.models.services.shop_service import ShopService
 
@@ -7,13 +6,21 @@ def shop_service():
     return ShopService()
 
 @pytest.mark.smoke
-def test_create_shop_success(client):
-    payload = {"address": "123 Main St", "manager": "Alice"}
-    
-    response = client.post("/shops", json=payload)
+def test_create_shop_success(shop_service):
+    """
+    TC-007 — POST /shops success
+    Crea un shop y valida campos básicos de respuesta.
+    """
+    payload = {"address": "Cinema Plaza", "manager": "Grace"}
 
-    assert response.status_code == 201
-    data = response.json()
-    assert data["address"] == "123 Main St"
-    assert data["manager"] == "Alice"
-    assert "id" in data
+    resp = shop_service.add_shop(shop=payload, response_type=None)
+    assert resp.status in (200, 201)
+
+    data = resp.data
+    assert isinstance(data, dict)
+    for k in ("id", "address", "manager"):
+        assert k in data
+
+    assert isinstance(data["id"], int)
+    assert data["address"] == "Cinema Plaza"
+    assert data["manager"] == "Grace"
