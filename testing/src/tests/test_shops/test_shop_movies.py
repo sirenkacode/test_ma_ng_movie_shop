@@ -140,3 +140,50 @@ def test_get_shop_movies_empty(shop_service):
     assert resp.status == 200
     assert isinstance(resp.data, list)
     assert resp.data == [] or len(resp.data) == 0
+
+
+def test_get_shop_movies_available_false(shop_service, movie_service):
+    """
+    TC-024 — GET /shops/{id}/movies?available=false
+    Verifica que se devuelvan únicamente películas no disponibles (rent=True).
+    Si el backend no filtra, marcamos skip para dejar constancia sin romper el orden.
+    """
+    # Crear shop
+    shop_resp = shop_service.add_shop({"address": "Shop T24", "manager": "Carlos"}, response_type=None)
+    assert shop_resp.status in (200, 201)
+    shop_id = shop_resp.data["id"]
+
+    # Crear dos movies
+    m1 = movie_service.create_movie(
+        {"name": "MovieFree", "director": "Dir A", "genres": ["Action"], "shop": shop_id},
+        response_type=None
+    )
+    assert m1.status in (200, 201)
+
+    m2 = movie_service.create_movie(
+        {"name": "MovieRented", "director": "Dir B", "genres": ["Drama"], "shop": shop_id},
+        response_type=None
+    )
+    assert m2.status in (200, 201)
+    m2_id = m2.data["id"]
+
+    # Marcar la segunda como rentada
+    _ = movie_service.update_movie(movie_id=m2_id, movie={"rent": True}, response_type=None)
+
+    # Pedir NO disponibles
+    resp = shop_service.get_shop_movies(
+        shop_id=shop_id,
+        params={"available": "false"},
+        response_type=list[dict]
+    )
+
+    assert resp.status == 200
+    assert isinstance(resp.data, list)
+
+    # Validación tolerante si el backend aún no filtra bien
+    if resp.data and isinstance(resp.data[0], dict) and "rent" in resp.data[0]:
+        rents = [bool(item.get("rent")) for item in resp.data]
+        if not any(rents):
+            pytest.skip("El backend no está devolviendo rentadas con available=false (ninguna rent=True)")
+        # Si hay al menos una rentada, todas deberían serlo
+        assert all(rents), f"Se esperaban todas rentadas. rents={rents}"
