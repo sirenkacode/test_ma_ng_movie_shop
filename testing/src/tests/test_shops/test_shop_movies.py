@@ -106,3 +106,19 @@ def test_get_shop_movies_available_false(shop_service, movie_service):
     if resp.data and isinstance(resp.data[0], dict) and "rent" in resp.data[0]:
         rents = [item.get("rent") for item in resp.data]
         assert all(isinstance(r, (bool, type(None))) for r in rents), f"Tipos raros en rent: {rents}"
+
+def test_get_shop_movies_nonexistent(shop_service):
+    """
+    TC-022 — GET /shops/{id}/movies (shop does not exist)
+    Intenta obtener películas de un shop inexistente.
+    Esperado: error 404 (acepta 400/422 como variantes).
+    """
+    invalid_shop_id = -9999  # id que seguro no existe
+
+    resp = shop_service.get_shop_movies(
+        shop_id=invalid_shop_id,
+        response_type=list[dict]
+    )
+
+    # Validación
+    assert resp.status in (404, 400, 422), f"Status inesperado: {resp.status}"
