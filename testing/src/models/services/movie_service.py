@@ -76,18 +76,19 @@ class MovieService(ServiceBase):
         )
 
     def search(
-        self,
-        name: str,
-        response_type: Type[T],
+        self, 
+        name: str, 
+        response_type=list[dict], 
         config: dict | None = None
-    ) -> Response[T]:
-        config = config or self.default_config
-        cfg = {**config, "params": {"name": name}} if config else {"params": {"name": name}}
+    ):
+        cfg = {"params": {"name": name}}
+        if config:
+            cfg.update(config)
         return self.get(
-            f"{self.url}/search",
-            config=cfg,
-            response_model=response_type,
-        )
+        f"{self.base_url}/search/movies",
+        config=cfg,
+        response_model=response_type,
+    )
 
     def transfer(
         self,

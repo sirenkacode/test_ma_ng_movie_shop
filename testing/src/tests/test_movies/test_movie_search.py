@@ -1,45 +1,43 @@
 import pytest
-from src.models.services.movie_service import MovieService
-from src.models.services.shop_service import ShopService
 
-@pytest.fixture
-def movie_service():
-    return MovieService()
+@pytest.mark.smoke
+def test_search_movies_finds_created_movie(services, shop_id):
+    movie_service = services["movie_service"]
+    payload = {"name": "The Matrix", "director": "The Wachowskis", "genres": ["Sci-Fi"], "shop": shop_id}
+    r = movie_service.create_movie(payload, response_type=None)
+    assert r.status in (200, 201)
+    mid = r.data["id"]
 
-@pytest.fixture
-def shop_service():
-    return ShopService()
+    resp = movie_service.search(name="Matrix", response_type=list[dict])
+    assert resp.status == 200
+    data = resp.data
+    assert isinstance(data, list)
+    assert any(
+        isinstance(m, dict)
+        and m.get("id") == mid
+        and m.get("name") == payload["name"]
+        and m.get("director") == payload["director"]
+        and isinstance(m.get("genres"), list)
+        and m.get("shop") == shop_id
+        for m in data
+    )
 
-def test_search_movies_matches_found(movie_service, shop_service):
-    """
-    TC-010: GET /movies/search?name=... (matches found)
-    """
-    shop_resp = shop_service.add_shop({"address": "Search Loc", "manager": "Mario"}, response_type=None)
-    assert shop_resp.status in (200, 201)
-    shop_id = shop_resp.data["id"]
+def test_search_movies_no_matches_returns_empty_list(services):
+    movie_service = services["movie_service"]
+    resp = movie_service.search(name="__no_match_token__", response_type=list[dict])
+    assert resp.status == 200
+    assert isinstance(resp.data, list) and len(resp.data) == 0
 
-    resp = movie_service.create_movie({
-        "name": "Matrix",
-        "director": "Wachowski",
-        "genres": ["Sci-Fi"],
-        "shop": shop_id,
-    }, response_type=None)
-    assert resp.status in (200, 201)
+@pytest.mark.parametrize("query", ["matrix", "MATRIX", "MaTrIx"])
+def test_search_movies_is_case_insensitive(services, shop_id, query):
+    movie_service = services["movie_service"]
+    r = movie_service.create_movie(
+        {"name": "The Matrix", "director": "The Wachowskis", "genres": ["Sci-Fi"], "shop": shop_id},
+        response_type=None,
+    )
+    assert r.status in (200, 201)
+    mid = r.data["id"]
 
- 
-    search_resp = movie_service.search(name="Matrix", response_type=list[dict])
-
-
-    assert search_resp.status in (200, 422)
-
-def test_search_movies_no_matches(movie_service):
-    """
-    TC-011: GET /movies/search?name=... (no matches)
-    """
-    search_resp = movie_service.search(name="__nope__", response_type=list[dict])
-
-    assert search_resp.status in (200, 422)
-    if search_resp.status == 200:
-        assert isinstance(search_resp.data, list)
-        assert len(search_resp.data) == 0
-
+    resp = movie_service.search(name=query, response_type=list[dict])
+    assert resp.status == 200
+    assert any(isinstance(m, dict) and m.get("id") == mid for m in resp.data)

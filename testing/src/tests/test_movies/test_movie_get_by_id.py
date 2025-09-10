@@ -1,42 +1,34 @@
 import pytest
-from src.models.services.movie_service import MovieService
-from src.models.services.shop_service import ShopService
-
-@pytest.fixture
-def movie_service():
-    return MovieService()
-
-@pytest.fixture
-def shop_service():
-    return ShopService()
-
-def _mk_shop(shop_service):
-    resp = shop_service.add_shop({"address": "Loc GET", "manager": "Sara"}, response_type=None)
-    assert resp.status in (200, 201)
-    return resp.data["id"]
-
-def _mk_movie(movie_service, shop_id: int):
-    payload = {"name": "Memento", "director": "Christopher Nolan", "genres": ["Thriller"], "shop": shop_id}
-    resp = movie_service.create_movie(payload, response_type=None)
-    assert resp.status in (200, 201)
-    return resp.data["id"], payload
 
 @pytest.mark.smoke
-def test_get_movie_by_id_success(movie_service, shop_service):
-    # precondiciones: 
-    shop_id = _mk_shop(shop_service)
-    movie_id, created_payload = _mk_movie(movie_service, shop_id)
+def test_get_movie_by_id_success(services, shop_id):
+    movie_service = services["movie_service"]
 
-    # acción: 
+    create_payload = {
+        "name": "Memento",
+        "director": "Christopher Nolan",
+        "genres": ["Thriller"],
+        "shop": shop_id,
+    }
+    r = movie_service.create_movie(create_payload, response_type=None)
+    assert r.status in (200, 201)
+    movie_id = r.data["id"]
+
     resp = movie_service.get_movie(movie_id, response_type=dict)
     assert resp.status == 200
-    assert isinstance(resp.data, dict)
 
-    # verificaciones:
+    data = resp.data
+    assert isinstance(data, dict)
     for key in ("id", "name", "director", "genres", "shop"):
-        assert key in resp.data
-    assert resp.data["id"] == movie_id
-    assert resp.data["name"] == created_payload["name"]
-    assert resp.data["director"] == created_payload["director"]
-    assert resp.data["shop"] == shop_id
-    assert isinstance(resp.data["genres"], list) and len(resp.data["genres"]) >= 1
+        assert key in data
+    assert data["id"] == movie_id
+    assert data["name"] == create_payload["name"]
+    assert data["director"] == create_payload["director"]
+    assert data["shop"] == shop_id
+    assert isinstance(data["genres"], list) and len(data["genres"]) >= 1
+
+
+def test_get_movie_by_id_nonexistent_returns_404(services):
+    movie_service = services["movie_service"]
+    resp = movie_service.get_movie(999_999_999, response_type=dict)
+    assert resp.status == 404
